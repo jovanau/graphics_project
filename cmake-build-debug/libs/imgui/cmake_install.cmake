@@ -1,4 +1,4 @@
-# Install script for directory: /home/jovana/project_base-main/libs/imgui
+# Install script for directory: /home/jovana/Projekat/libs/imgui
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
