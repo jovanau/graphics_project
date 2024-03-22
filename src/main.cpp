@@ -33,7 +33,6 @@ const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
 // camera
-//Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = (float)SCR_WIDTH / 2.0f;
 float lastY = (float)SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -169,7 +168,8 @@ int main() {
     // -----------
 //    Model ourModel(FileSystem::getPath("resources/objects/backpack/backpack.obj"));
     Model ourModel(FileSystem::getPath("resources/objects/ironman/M-FF_iOS_HERO_Tony_Stark_Iron_Man_Classic.obj"));
-
+    Model dino(FileSystem::getPath("resources/objects/dino/T-rex.obj"));
+    Model space(FileSystem::getPath("resources/objects/space/Intergalactic_Spaceships_Version_2.obj"));
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
@@ -310,6 +310,12 @@ int main() {
         model = glm::scale(model, glm::vec3(programState->backpackScale));    // it's a bit too big for our scene, so scale it down
         ourShader.setMat4("model", model);
         ourModel.Draw(ourShader);
+
+
+        model = glm::translate(model, glm::vec3(-3.0f, -0.50f, 1.0f));
+        model = glm::scale(model, glm::vec3(0.1));
+        ourShader.setMat4("model", model);
+        dino.Draw(ourShader);
 
         // draw skybox as last
         glDepthMask(GL_FALSE);
