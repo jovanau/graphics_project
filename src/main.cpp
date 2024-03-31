@@ -21,15 +21,18 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
-unsigned int loadTexture(const char *path, bool gammaCorrection);
+unsigned int loadTexture(const char *path);
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
 unsigned int loadCubemap(vector<std::string> faces);
 void renderQuad();
 void renderCube();
+void renderGround();
 
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
+float heightScale = 0.1;
+
 bool bloom = true;
 bool bloomKeyPressed = false;
 float exposure = 1.0f;
@@ -59,8 +62,6 @@ struct ProgramState {
     bool ImGuiEnabled = false;
     Camera camera;
     bool CameraMouseMovementUpdateEnabled = true;
-    glm::vec3 backpackPosition = glm::vec3(0.0f);
-    float backpackScale = 1.0f;
     PointLight pointLight;
     ProgramState()
             : camera(glm::vec3(0.0f, 0.0f, 3.0f)) {}
@@ -157,11 +158,11 @@ int main() {
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
 
+    glEnable(GL_CULL_FACE);
+
+
     // build and compile shaders
     // -------------------------
-    Shader groundShader(FileSystem::getPath("resources/shaders/ground.vs").c_str(), FileSystem::getPath("resources/shaders/ground.fs").c_str());
-
-    Shader shader("resources/shaders/bloom.vs", "resources/shaders/bloom.fs");
     Shader shaderLight("resources/shaders/bloom.vs", "resources/shaders/light_box.fs");
     Shader shaderBlur("resources/shaders/blur.vs", "resources/shaders/blur.fs");
     Shader shaderBloomFinal("resources/shaders/bloom_final.vs", "resources/shaders/bloom_final.fs");
@@ -169,9 +170,29 @@ int main() {
     Shader skyboxShader("resources/shaders/6.1.skybox.vs", "resources/shaders/6.1.skybox.fs");
     Shader ourShader("resources/shaders/1.model_loading.vs", "resources/shaders/1.model_loading.fs");
 
+    Shader shaderGround("resources/shaders/parallax_mapping.vs", "resources/shaders/parallax_mapping.fs");
+
+    // load models
+    // -----------
+    Model ourModel(FileSystem::getPath("resources/objects/ironman/M-FF_iOS_HERO_Tony_Stark_Iron_Man_Classic.obj"));
+    ourModel.SetShaderTextureNamePrefix("material.");
+    Model dino(FileSystem::getPath("resources/objects/dino/T-rex.obj"));
+    dino.SetShaderTextureNamePrefix("material.");
+
     // load textures
     // -------------
-     unsigned int woodTexture = loadTexture(FileSystem::getPath("resources/textures/concrete-wall-texture.jpg").c_str(), true);
+//     unsigned int woodTexture = loadTexture(FileSystem::getPath("resources/textures/concrete-wall-texture.jpg").c_str(), true);
+     unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/diffuse.jpg").c_str());
+     unsigned int normalMap  = loadTexture(FileSystem::getPath("resources/textures/normal.jpg").c_str());
+     unsigned int heightMap  = loadTexture(FileSystem::getPath("resources/textures/height.jpg").c_str());
+
+
+    // shader configuration
+    // --------------------
+    shaderGround.use();
+    shaderGround.setInt("diffuseMap", 0);
+    shaderGround.setInt("normalMap", 1);
+    shaderGround.setInt("depthMap", 2);
 
     // configure (floating point) framebuffers
     // ---------------------------------------
@@ -230,10 +251,10 @@ int main() {
     // -------------
     // positions
     std::vector<glm::vec3> lightPositions;
-    lightPositions.push_back(glm::vec3( 0.0f, 0.5f,  1.5f));
-    lightPositions.push_back(glm::vec3(-4.0f, 0.5f, 3.0f));
-    lightPositions.push_back(glm::vec3( 3.0f, 0.5f,  1.0f));
-    lightPositions.push_back(glm::vec3(-.8f,  2.4f, -1.0f));
+    lightPositions.push_back(glm::vec3( -5.0f, 3.5f,  -2.0f));
+    lightPositions.push_back(glm::vec3(-9.0f, 3.5f, -2.0f));
+    lightPositions.push_back(glm::vec3( -11.0f, 1.75f,  -2.0f));
+    lightPositions.push_back(glm::vec3(-3.0f,  1.75f, -2.0f));
     // colors
     std::vector<glm::vec3> lightColors;
     lightColors.push_back(glm::vec3(5.0f,   5.0f,  5.0f));
@@ -243,22 +264,28 @@ int main() {
 
     // shader configuration
     // --------------------
-    shader.use();
-    shader.setInt("diffuseTexture", 0);
+//    shader.use();
+//    shader.setInt("diffuseTexture", 0);
     shaderBlur.use();
     shaderBlur.setInt("image", 0);
     shaderBloomFinal.use();
     shaderBloomFinal.setInt("scene", 0);
     shaderBloomFinal.setInt("bloomBlur", 1);
 
-    // load models
-    // -----------
-    Model ourModel(FileSystem::getPath("resources/objects/ironman/M-FF_iOS_HERO_Tony_Stark_Iron_Man_Classic.obj"));
-    ourModel.SetShaderTextureNamePrefix("material.");
-    Model dino(FileSystem::getPath("resources/objects/dino/T-rex.obj"));
-    dino.SetShaderTextureNamePrefix("material.");
-    Model space(FileSystem::getPath("resources/objects/space/Intergalactic_Spaceships_Version_2.obj"));
-    space.SetShaderTextureNamePrefix("material.");
+    //translation for dinos
+    float x[24]  = {
+            0.0f, -7.0, -5.0f, -2.0f, -4.0f, -10.0,
+            -1.0f, -6.0f, -9.f, -1.0f, -11.0, -8.0f,
+            -1.0f, -5.0f, -7.0f,-3.0f, -11.0f, -2.0f,
+            -4.0f, -6.0f, -9.0f,-8.0f, -12.0f, -10.0f,
+    };
+    float z[24] = {
+            1.0f, 5.0f, 7.0f,3.0f, 11.0f, 2.0f,
+            4.0f, 6.0f, 9.0f,8.0f, 12.0f, 10.0f,
+            0.0f, 7.0, 5.0f, 2.0f, 4.0f, 10.0,
+            1.0f, 6.0f, 9.f, 1.0f, 11.0, 8.0f
+    };
+
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
@@ -317,6 +344,15 @@ int main() {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
+//    vector<std::string> faces
+//            {
+//                    FileSystem::getPath("resources/textures/skyy/left.png"),
+//                    FileSystem::getPath("resources/textures/skyy/right.png"),
+//                    FileSystem::getPath("resources/textures/skyy/top.png"),
+//                    FileSystem::getPath("resources/textures/skyy/bottom.png"),
+//                    FileSystem::getPath("resources/textures/skyy/front.png"),
+//                    FileSystem::getPath("resources/textures/skyy/back.png")
+//            };
     vector<std::string> faces
             {
                     FileSystem::getPath("resources/textures/sky/left.jpg"),
@@ -331,15 +367,15 @@ int main() {
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
 
-//    PointLight& pointLight = programState->pointLight;
-//    pointLight.position = glm::vec3(4.0f, 4.0, 0.0);
-//    pointLight.ambient = glm::vec3(0.1, 0.1, 0.1);
-//    pointLight.diffuse = glm::vec3(0.6, 0.6, 0.6);
-//    pointLight.specular = glm::vec3(1.0, 1.0, 1.0);
-//
-//    pointLight.constant = 1.0f;
-//    pointLight.linear = 0.09f;
-//    pointLight.quadratic = 0.032f;
+    PointLight& pointLight = programState->pointLight;
+    pointLight.position = glm::vec3(4.0f, 4.0, 0.0);
+    pointLight.ambient = glm::vec3(0.1, 0.1, 0.1);
+    pointLight.diffuse = glm::vec3(0.6, 0.6, 0.6);
+    pointLight.specular = glm::vec3(1.0, 1.0, 1.0);
+
+    pointLight.constant = 1.0f;
+    pointLight.linear = 0.09f;
+    pointLight.quadratic = 0.032f;
 
     while (!glfwWindowShouldClose(window)) {
         // per-frame time logic
@@ -360,7 +396,8 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // don't forget to enable shader before setting uniforms
-        ourShader.use();
+//        ourShader.use();
+//
 //        pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
 //        ourShader.setVec3("pointLight.position", pointLight.position);
 //        ourShader.setVec3("pointLight.ambient", pointLight.ambient);
@@ -369,62 +406,209 @@ int main() {
 //        ourShader.setFloat("pointLight.constant", pointLight.constant);
 //        ourShader.setFloat("pointLight.linear", pointLight.linear);
 //        ourShader.setFloat("pointLight.quadratic", pointLight.quadratic);
+//
 //        ourShader.setVec3("viewPosition", programState->camera.Position);
+//
 //        ourShader.setFloat("material.shininess", 32.0f);
+//
+//        // view/projection transformations
+//        glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
+//                                                (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
+//        glm::mat4 view = programState->camera.GetViewMatrix();
+//        glm::mat4 model = glm::mat4(1.0f);
+//
+//        ourShader.setMat4("projection", projection);
+//        ourShader.setMat4("view", view);
+//
+//        shaderGround.use();
+//        shaderGround.setMat4("projection", projection);
+//        shaderGround.setMat4("view", view);
+//
+//        // render parallax-mapped
+//        glEnable(GL_CULL_FACE);
+//        glCullFace(GL_BACK);
+//        model = glm::mat4(1.0f); // rotate the quad to show parallax mapping from multiple directions
+//
+//        shaderGround.setMat4("model", model);
+//        shaderGround.setVec3("viewPos", programState->camera.Position);
+//        shaderGround.setFloat("heightScale", heightScale); // adjust with Q and E keys
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_2D, diffuseMap);
+//        glActiveTexture(GL_TEXTURE1);
+//        glBindTexture(GL_TEXTURE_2D, normalMap);
+//        glActiveTexture(GL_TEXTURE2);
+//        glBindTexture(GL_TEXTURE_2D, heightMap);
+//        renderGround();
+//
+//        glDisable(GL_CULL_FACE);
+//        // render the loaded model
+//        model = glm::mat4(1.0f);
+//        model = glm::translate(model,
+//                               glm::vec3(2.0f, 3.0f + 0.5*sin(glfwGetTime()), 0.0f)); // translate it down so it's at the center of the scene
+//        model = glm::scale(model, glm::vec3(1.2f));    // it's a bit too big for our scene, so scale it down
+//        ourShader.setMat4("model", model);
+//        ourModel.Draw(ourShader);
+//
+//        for(unsigned int i = 0; i < 12;i++){
+//            model = glm::mat4(1.0f);
+//            model = glm::translate(model, glm::vec3(x[i], -0.50f, z[i]));
+//            model = glm::rotate(model, (float)glm::radians(180.0), glm::vec3(0, 1, 0));
+//            model = glm::scale(model, glm::vec3(0.11));
+//
+//            ourShader.setMat4("model", model);
+//            dino.Draw(ourShader);
+//        }
+//
+////         set lighting uniforms
+//        for (unsigned int i = 0; i < lightPositions.size(); i++)
+//        {
+//            ourShader.setVec3("lights[" + std::to_string(i) + "].Position", lightPositions[i]);
+//            ourShader.setVec3("lights[" + std::to_string(i) + "].Color", lightColors[i]);
+//        }
+//        ourShader.setVec3("viewPos", programState->camera.Position);
+
+//        glEnable(GL_CULL_FACE);
+//        glCullFace(GL_BACK);
+//
+//        // finally show all the light sources as bright cubes
+//        shaderLight.use();
+//        shaderLight.setMat4("projection", projection);
+//        shaderLight.setMat4("view", view);
+//
+//        for (unsigned int i = 0; i < lightPositions.size(); i++)
+//        {
+//            model = glm::mat4(1.0f);
+//            model = glm::translate(model, glm::vec3(lightPositions[i]));
+//            model = glm::scale(model, glm::vec3(0.25f));
+//            shaderLight.setMat4("model", model);
+//            shaderLight.setVec3("lightColor", lightColors[i]);
+//            renderCube();
+//        }
+//
+//        glDisable(GL_CULL_FACE);
+
+//        // draw skybox as last
+//        glDepthMask(GL_FALSE);
+//        glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
+//        skyboxShader.use();
+//        view = glm::mat4(glm::mat3(programState->camera.GetViewMatrix())); // remove translation from the view matrix
+//        skyboxShader.setMat4("view", view);
+//        skyboxShader.setMat4("projection", projection);
+//
+//        // skybox cube
+//        glBindVertexArray(skyboxVAO);
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+//        glDrawArrays(GL_TRIANGLES, 0, 36);
+//        glBindVertexArray(0);
+//        glDepthMask(GL_TRUE);
+//        glDepthFunc(GL_LESS); // set depth function back to default
+//
+//        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // 2. blur bright fragments with two-pass Gaussian Blur
+        // --------------------------------------------------
+        bool horizontal = true, first_iteration = true;
+        unsigned int amount = 10;
+        shaderBlur.use();
+        for (unsigned int i = 0; i < amount; i++)
+        {
+            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[horizontal]);
+            shaderBlur.setInt("horizontal", horizontal);
+            glBindTexture(GL_TEXTURE_2D, first_iteration ? colorBuffers[1] : pingpongColorbuffers[!horizontal]);  // bind texture of other framebuffer (or scene if first iteration)
+            renderQuad();
+            horizontal = !horizontal;
+            if (first_iteration)
+                first_iteration = false;
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // 3. now render floating point color buffer to 2D quad and tonemap HDR colors to default framebuffer's (clamped) color range
+        // --------------------------------------------------------------------------------------------------------------------------
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        shaderBloomFinal.use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, colorBuffers[0]);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[!horizontal]);
+        shaderBloomFinal.setInt("bloom", bloom);
+        shaderBloomFinal.setFloat("exposure", exposure);
+
+        ourShader.use();
+
+        pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
+        ourShader.setVec3("pointLight.position", pointLight.position);
+        ourShader.setVec3("pointLight.ambient", pointLight.ambient);
+        ourShader.setVec3("pointLight.diffuse", pointLight.diffuse);
+        ourShader.setVec3("pointLight.specular", pointLight.specular);
+        ourShader.setFloat("pointLight.constant", pointLight.constant);
+        ourShader.setFloat("pointLight.linear", pointLight.linear);
+        ourShader.setFloat("pointLight.quadratic", pointLight.quadratic);
+
+        ourShader.setVec3("viewPosition", programState->camera.Position);
+
+        ourShader.setFloat("material.shininess", 32.0f);
 
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
                                                 (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = programState->camera.GetViewMatrix();
+        glm::mat4 model = glm::mat4(1.0f);
 
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
 
+        shaderGround.use();
+        shaderGround.setMat4("projection", projection);
+        shaderGround.setMat4("view", view);
+
+        // render parallax-mapped
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        model = glm::mat4(1.0f); // rotate the quad to show parallax mapping from multiple directions
+
+        shaderGround.setMat4("model", model);
+        shaderGround.setVec3("viewPos", programState->camera.Position);
+        shaderGround.setFloat("heightScale", heightScale); // adjust with Q and E keys
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, diffuseMap);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, normalMap);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, heightMap);
+        renderGround();
+
+        glDisable(GL_CULL_FACE);
         // render the loaded model
-        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::mat4(1.0f);
         model = glm::translate(model,
-                               programState->backpackPosition); // translate it down so it's at the center of the scene
-        model = glm::scale(model, glm::vec3(programState->backpackScale));    // it's a bit too big for our scene, so scale it down
+                               glm::vec3(-7.0f, 3.0f + 0.5*sin(glfwGetTime()), -2.0f)); // translate it down so it's at the center of the scene
+        model = glm::scale(model, glm::vec3(1.2f));    // it's a bit too big for our scene, so scale it down
         ourShader.setMat4("model", model);
         ourModel.Draw(ourShader);
 
-        model = glm::translate(model, glm::vec3(-3.0f, -0.50f, 1.0f));
-        model = glm::scale(model, glm::vec3(0.1));
-        ourShader.setMat4("model", model);
-        dino.Draw(ourShader);
+        for(unsigned int i = 0; i < 24;i++){
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(x[i], -0.50f, z[i]));
+            model = glm::rotate(model, (float)glm::radians(180.0), glm::vec3(0, 1, 0));
+            model = glm::scale(model, glm::vec3(0.11));
 
-//        model = glm::mat4(1.0f);
-//        model = glm::translate(model, glm::vec3(3.0f, 2.50f, -1.0f));
-//        model = glm::scale(model, glm::vec3(2));
-//        ourShader.setMat4("model", model);
-//        space.Draw(ourShader);
+            ourShader.setMat4("model", model);
+            dino.Draw(ourShader);
+        }
 
-        // 1. render scene into floating point framebuffer
-//        // -----------------------------------------------
-//        glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
-//        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        projection = glm::perspective(glm::radians(programState->camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        view = programState->camera.GetViewMatrix();
-        model = glm::mat4(1.0f);
-        shader.use();
-        shader.setMat4("projection", projection);
-        shader.setMat4("view", view);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, woodTexture);
-        // set lighting uniforms
+//         set lighting uniforms
         for (unsigned int i = 0; i < lightPositions.size(); i++)
         {
-            shader.setVec3("lights[" + std::to_string(i) + "].Position", lightPositions[i]);
-            shader.setVec3("lights[" + std::to_string(i) + "].Color", lightColors[i]);
+            ourShader.setVec3("lights[" + std::to_string(i) + "].Position", lightPositions[i]);
+            ourShader.setVec3("lights[" + std::to_string(i) + "].Color", lightColors[i]);
         }
-        shader.setVec3("viewPos", programState->camera.Position);
+        ourShader.setVec3("viewPos", programState->camera.Position);
 
-        // create one large cube that acts as the floor
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0));
-        model = glm::scale(model, glm::vec3(12.5f, 0.5f, 12.5f));
-        shader.setMat4("model", model);
-        renderCube();
+
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
 
         // finally show all the light sources as bright cubes
         shaderLight.use();
@@ -440,6 +624,8 @@ int main() {
             shaderLight.setVec3("lightColor", lightColors[i]);
             renderCube();
         }
+
+        glDisable(GL_CULL_FACE);
 
         // draw skybox as last
         glDepthMask(GL_FALSE);
@@ -460,37 +646,9 @@ int main() {
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        // 2. blur bright fragments with two-pass Gaussian Blur
-        // --------------------------------------------------
-        bool horizontal = true, first_iteration = true;
-        unsigned int amount = 10;
-        shaderBlur.use();
-        for (unsigned int i = 0; i < amount; i++)
-        {
-            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[horizontal]);
-            shaderBlur.setInt("horizontal", horizontal);
-            glBindTexture(GL_TEXTURE_2D, first_iteration ? colorBuffers[1] : pingpongColorbuffers[!horizontal]);  // bind texture of other framebuffer (or scene if first iteration)
-            renderQuad();
-            horizontal = !horizontal;
-            if (first_iteration)
-                first_iteration = false;
-        }
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        // 3. now render floating point color buffer to 2D quad and tonemap HDR colors to default framebuffer's (clamped) color range
-        // --------------------------------------------------------------------------------------------------------------------------
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        shaderBloomFinal.use();
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, colorBuffers[0]);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[!horizontal]);
-        shaderBloomFinal.setInt("bloom", bloom);
-        shaderBloomFinal.setFloat("exposure", exposure);
         renderQuad();
 
-        std::cout << "bloom: " << (bloom ? "on" : "off") << "| exposure: " << exposure << std::endl;
-
+//        std::cout << "bloom: " << (bloom ? "on" : "off") << "| exposure: " << exposure << std::endl;
 
 //        if (programState->ImGuiEnabled)
 //            DrawImGui(programState);
@@ -565,6 +723,100 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
     programState->camera.ProcessMouseScroll(yoffset);
 }
 
+//Normal-Parallax mapping for ground
+unsigned int groundVAO = 0;
+unsigned int groundVBO;
+void renderGround(){
+
+    if (groundVAO == 0){
+        // positions
+        glm::vec3 pos1(100.0f,  -0.8f, 100.0f);
+        glm::vec3 pos2(100.0f, -0.8f, -100.0f);
+        glm::vec3 pos3( -150.0f, -0.8f, -100.0f);
+        glm::vec3 pos4( -150.0f,  -0.8f, 100.0f);
+        // texture coordinates
+        glm::vec2 uv1(0.0f, 1.0f);
+        glm::vec2 uv2(0.0f, 0.0f);
+        glm::vec2 uv3(1.0f, 0.0f);
+        glm::vec2 uv4(1.0f, 1.0f);
+        // normal vector
+        glm::vec3 nm(0.0f, 0.0f, 1.0f);
+
+        // calculate tangent/bitangent vectors of both triangles
+        glm::vec3 tangent1, bitangent1;
+        glm::vec3 tangent2, bitangent2;
+        // triangle 1
+        // ----------
+        glm::vec3 edge1 = pos2 - pos1;
+        glm::vec3 edge2 = pos3 - pos1;
+        glm::vec2 deltaUV1 = uv2 - uv1;
+        glm::vec2 deltaUV2 = uv3 - uv1;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        tangent1.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent1.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent1.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+        tangent1 = glm::normalize(tangent1);
+
+        bitangent1.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+        bitangent1.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+        bitangent1.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+        bitangent1 = glm::normalize(bitangent1);
+
+        // triangle 2
+        // ----------
+        edge1 = pos3 - pos1;
+        edge2 = pos4 - pos1;
+        deltaUV1 = uv3 - uv1;
+        deltaUV2 = uv4 - uv1;
+
+        f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        tangent2.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent2.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent2.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+        tangent2 = glm::normalize(tangent2);
+
+
+        bitangent2.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+        bitangent2.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+        bitangent2.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+        bitangent2 = glm::normalize(bitangent2);
+
+
+        float groundVertices[] = {
+                // positions            // normal         // texcoords  // tangent                          // bitangent
+                pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+                pos2.x, pos2.y, pos2.z, nm.x, nm.y, nm.z, uv2.x, uv2.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+                pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+
+                pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
+                pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
+                pos4.x, pos4.y, pos4.z, nm.x, nm.y, nm.z, uv4.x, uv4.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z
+        };
+        // configure plane VAO
+        glGenVertexArrays(1, &groundVAO);
+        glGenBuffers(1, &groundVBO);
+        glBindVertexArray(groundVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, groundVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(groundVertices), &groundVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(6 * sizeof(float)));
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
+        glEnableVertexAttribArray(4);
+        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
+    }
+    glBindVertexArray(groundVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+}
+
 void DrawImGui(ProgramState *programState) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -577,8 +829,6 @@ void DrawImGui(ProgramState *programState) {
         ImGui::Text("Hello text");
         ImGui::SliderFloat("Float slider", &f, 0.0, 1.0);
         ImGui::ColorEdit3("Background color", (float *) &programState->clearColor);
-        ImGui::DragFloat3("Backpack position", (float*)&programState->backpackPosition);
-        ImGui::DragFloat("Backpack scale", &programState->backpackScale, 0.05, 0.1, 4.0);
 
         ImGui::DragFloat("pointLight.constant", &programState->pointLight.constant, 0.05, 0.0, 1.0);
         ImGui::DragFloat("pointLight.linear", &programState->pointLight.linear, 0.05, 0.0, 1.0);
@@ -651,34 +901,24 @@ unsigned int loadCubemap(vector<std::string> faces)
     return textureID;
 }
 
-unsigned int loadTexture(char const * path, bool gammaCorrection)
+unsigned int loadTexture(char const * path)
 {
     unsigned int textureID;
     glGenTextures(1, &textureID);
 
     int width, height, nrComponents;
     unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
-    if (data)
-    {
-        GLenum internalFormat;
-        GLenum dataFormat;
+    if (data){
+        GLenum format;
         if (nrComponents == 1)
-        {
-            internalFormat = dataFormat = GL_RED;
-        }
+            format = GL_RED;
         else if (nrComponents == 3)
-        {
-            internalFormat = gammaCorrection ? GL_SRGB : GL_RGB;
-            dataFormat = GL_RGB;
-        }
+            format = GL_RGB;
         else if (nrComponents == 4)
-        {
-            internalFormat = gammaCorrection ? GL_SRGB_ALPHA : GL_RGBA;
-            dataFormat = GL_RGBA;
-        }
+            format = GL_RGBA;
 
         glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, dataFormat, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
