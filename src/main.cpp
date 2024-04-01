@@ -36,6 +36,7 @@ float heightScale = 0.1;
 bool bloom = true;
 bool bloomKeyPressed = false;
 float exposure = 1.0f;
+bool blinn = false;
 
 // camera
 float lastX = (float)SCR_WIDTH / 2.0f;
@@ -47,7 +48,6 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 struct PointLight {
-    glm::vec3 position;
     glm::vec3 ambient;
     glm::vec3 diffuse;
     glm::vec3 specular;
@@ -55,6 +55,14 @@ struct PointLight {
     float constant;
     float linear;
     float quadratic;
+};
+
+struct DirLight {
+    glm::vec3 direction;
+
+    glm::vec3 ambient;
+    glm::vec3 diffuse;
+    glm::vec3 specular;
 };
 
 struct ProgramState {
@@ -160,7 +168,6 @@ int main() {
 
     glEnable(GL_CULL_FACE);
 
-
     // build and compile shaders
     // -------------------------
     Shader shaderLight("resources/shaders/bloom.vs", "resources/shaders/light_box.fs");
@@ -181,18 +188,9 @@ int main() {
 
     // load textures
     // -------------
-//     unsigned int woodTexture = loadTexture(FileSystem::getPath("resources/textures/concrete-wall-texture.jpg").c_str(), true);
      unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/diffuse.jpg").c_str());
      unsigned int normalMap  = loadTexture(FileSystem::getPath("resources/textures/normal.jpg").c_str());
      unsigned int heightMap  = loadTexture(FileSystem::getPath("resources/textures/height.jpg").c_str());
-
-
-    // shader configuration
-    // --------------------
-    shaderGround.use();
-    shaderGround.setInt("diffuseMap", 0);
-    shaderGround.setInt("normalMap", 1);
-    shaderGround.setInt("depthMap", 2);
 
     // configure (floating point) framebuffers
     // ---------------------------------------
@@ -248,7 +246,15 @@ int main() {
     }
 
     // lighting info
-    // -------------
+    // ----------------------------
+
+    //directional light init
+    DirLight directional;
+    directional.direction = glm::vec3(8.8f, -2.0f, -1.6f);
+    directional.ambient = glm::vec3(0.5f);
+    directional.diffuse = glm::vec3(0.2f);
+    directional.specular = glm::vec3(0.3f);
+
     // positions
     std::vector<glm::vec3> lightPositions;
     lightPositions.push_back(glm::vec3( -5.0f, 3.5f,  -2.0f));
@@ -262,15 +268,14 @@ int main() {
     lightColors.push_back(glm::vec3(5.0f,   5.0f,  5.0f));
     lightColors.push_back(glm::vec3(5.0f,   5.0f,  5.0f));
 
-    // shader configuration
-    // --------------------
-//    shader.use();
-//    shader.setInt("diffuseTexture", 0);
-    shaderBlur.use();
-    shaderBlur.setInt("image", 0);
-    shaderBloomFinal.use();
-    shaderBloomFinal.setInt("scene", 0);
-    shaderBloomFinal.setInt("bloomBlur", 1);
+    PointLight pointLight;
+    pointLight.ambient = glm::vec3(0.1, 0.1, 0.1);
+    pointLight.diffuse = glm::vec3(0.6, 0.6, 0.6);
+    pointLight.specular = glm::vec3(1.0, 1.0, 1.0);
+
+    pointLight.constant = 1.0f;
+    pointLight.linear = 0.09f;
+    pointLight.quadratic = 0.032f;
 
     //translation for dinos
     float x[24]  = {
@@ -285,7 +290,6 @@ int main() {
             0.0f, 7.0, 5.0f, 2.0f, 4.0f, 10.0,
             1.0f, 6.0f, 9.f, 1.0f, 11.0, 8.0f
     };
-
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
@@ -344,38 +348,41 @@ int main() {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
-//    vector<std::string> faces
-//            {
-//                    FileSystem::getPath("resources/textures/skyy/left.png"),
-//                    FileSystem::getPath("resources/textures/skyy/right.png"),
-//                    FileSystem::getPath("resources/textures/skyy/top.png"),
-//                    FileSystem::getPath("resources/textures/skyy/bottom.png"),
-//                    FileSystem::getPath("resources/textures/skyy/front.png"),
-//                    FileSystem::getPath("resources/textures/skyy/back.png")
-//            };
     vector<std::string> faces
             {
-                    FileSystem::getPath("resources/textures/sky/left.jpg"),
-                    FileSystem::getPath("resources/textures/sky/right.jpg"),
-                    FileSystem::getPath("resources/textures/sky/top.jpg"),
-                    FileSystem::getPath("resources/textures/sky/bottom.jpg"),
-                    FileSystem::getPath("resources/textures/sky/front.jpg"),
-                    FileSystem::getPath("resources/textures/sky/back.jpg")
+                    FileSystem::getPath("resources/textures/skyy/left.png"),
+                    FileSystem::getPath("resources/textures/skyy/right.png"),
+                    FileSystem::getPath("resources/textures/skyy/top.png"),
+                    FileSystem::getPath("resources/textures/skyy/bottom.png"),
+                    FileSystem::getPath("resources/textures/skyy/front.png"),
+                    FileSystem::getPath("resources/textures/skyy/back.png")
             };
+//    vector<std::string> faces
+//            {
+//                    FileSystem::getPath("resources/textures/sky/left.jpg"),
+//                    FileSystem::getPath("resources/textures/sky/right.jpg"),
+//                    FileSystem::getPath("resources/textures/sky/top.jpg"),
+//                    FileSystem::getPath("resources/textures/sky/bottom.jpg"),
+//                    FileSystem::getPath("resources/textures/sky/front.jpg"),
+//                    FileSystem::getPath("resources/textures/sky/back.jpg")
+//            };
     unsigned int cubemapTexture = loadCubemap(faces);
 
+    // shader configuration
+    // --------------------
+    shaderBlur.use();
+    shaderBlur.setInt("image", 0);
+    shaderBloomFinal.use();
+    shaderBloomFinal.setInt("scene", 0);
+    shaderBloomFinal.setInt("bloomBlur", 1);
+    shaderGround.use();
+    shaderGround.setInt("diffuseMap", 0);
+    shaderGround.setInt("normalMap", 1);
+    shaderGround.setInt("depthMap", 2);
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
 
-    PointLight& pointLight = programState->pointLight;
-    pointLight.position = glm::vec3(4.0f, 4.0, 0.0);
-    pointLight.ambient = glm::vec3(0.1, 0.1, 0.1);
-    pointLight.diffuse = glm::vec3(0.6, 0.6, 0.6);
-    pointLight.specular = glm::vec3(1.0, 1.0, 1.0);
 
-    pointLight.constant = 1.0f;
-    pointLight.linear = 0.09f;
-    pointLight.quadratic = 0.032f;
 
     while (!glfwWindowShouldClose(window)) {
         // per-frame time logic
@@ -396,159 +403,7 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // don't forget to enable shader before setting uniforms
-//        ourShader.use();
-//
-//        pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
-//        ourShader.setVec3("pointLight.position", pointLight.position);
-//        ourShader.setVec3("pointLight.ambient", pointLight.ambient);
-//        ourShader.setVec3("pointLight.diffuse", pointLight.diffuse);
-//        ourShader.setVec3("pointLight.specular", pointLight.specular);
-//        ourShader.setFloat("pointLight.constant", pointLight.constant);
-//        ourShader.setFloat("pointLight.linear", pointLight.linear);
-//        ourShader.setFloat("pointLight.quadratic", pointLight.quadratic);
-//
-//        ourShader.setVec3("viewPosition", programState->camera.Position);
-//
-//        ourShader.setFloat("material.shininess", 32.0f);
-//
-//        // view/projection transformations
-//        glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
-//                                                (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
-//        glm::mat4 view = programState->camera.GetViewMatrix();
-//        glm::mat4 model = glm::mat4(1.0f);
-//
-//        ourShader.setMat4("projection", projection);
-//        ourShader.setMat4("view", view);
-//
-//        shaderGround.use();
-//        shaderGround.setMat4("projection", projection);
-//        shaderGround.setMat4("view", view);
-//
-//        // render parallax-mapped
-//        glEnable(GL_CULL_FACE);
-//        glCullFace(GL_BACK);
-//        model = glm::mat4(1.0f); // rotate the quad to show parallax mapping from multiple directions
-//
-//        shaderGround.setMat4("model", model);
-//        shaderGround.setVec3("viewPos", programState->camera.Position);
-//        shaderGround.setFloat("heightScale", heightScale); // adjust with Q and E keys
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, diffuseMap);
-//        glActiveTexture(GL_TEXTURE1);
-//        glBindTexture(GL_TEXTURE_2D, normalMap);
-//        glActiveTexture(GL_TEXTURE2);
-//        glBindTexture(GL_TEXTURE_2D, heightMap);
-//        renderGround();
-//
-//        glDisable(GL_CULL_FACE);
-//        // render the loaded model
-//        model = glm::mat4(1.0f);
-//        model = glm::translate(model,
-//                               glm::vec3(2.0f, 3.0f + 0.5*sin(glfwGetTime()), 0.0f)); // translate it down so it's at the center of the scene
-//        model = glm::scale(model, glm::vec3(1.2f));    // it's a bit too big for our scene, so scale it down
-//        ourShader.setMat4("model", model);
-//        ourModel.Draw(ourShader);
-//
-//        for(unsigned int i = 0; i < 12;i++){
-//            model = glm::mat4(1.0f);
-//            model = glm::translate(model, glm::vec3(x[i], -0.50f, z[i]));
-//            model = glm::rotate(model, (float)glm::radians(180.0), glm::vec3(0, 1, 0));
-//            model = glm::scale(model, glm::vec3(0.11));
-//
-//            ourShader.setMat4("model", model);
-//            dino.Draw(ourShader);
-//        }
-//
-////         set lighting uniforms
-//        for (unsigned int i = 0; i < lightPositions.size(); i++)
-//        {
-//            ourShader.setVec3("lights[" + std::to_string(i) + "].Position", lightPositions[i]);
-//            ourShader.setVec3("lights[" + std::to_string(i) + "].Color", lightColors[i]);
-//        }
-//        ourShader.setVec3("viewPos", programState->camera.Position);
-
-//        glEnable(GL_CULL_FACE);
-//        glCullFace(GL_BACK);
-//
-//        // finally show all the light sources as bright cubes
-//        shaderLight.use();
-//        shaderLight.setMat4("projection", projection);
-//        shaderLight.setMat4("view", view);
-//
-//        for (unsigned int i = 0; i < lightPositions.size(); i++)
-//        {
-//            model = glm::mat4(1.0f);
-//            model = glm::translate(model, glm::vec3(lightPositions[i]));
-//            model = glm::scale(model, glm::vec3(0.25f));
-//            shaderLight.setMat4("model", model);
-//            shaderLight.setVec3("lightColor", lightColors[i]);
-//            renderCube();
-//        }
-//
-//        glDisable(GL_CULL_FACE);
-
-//        // draw skybox as last
-//        glDepthMask(GL_FALSE);
-//        glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
-//        skyboxShader.use();
-//        view = glm::mat4(glm::mat3(programState->camera.GetViewMatrix())); // remove translation from the view matrix
-//        skyboxShader.setMat4("view", view);
-//        skyboxShader.setMat4("projection", projection);
-//
-//        // skybox cube
-//        glBindVertexArray(skyboxVAO);
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
-//        glDrawArrays(GL_TRIANGLES, 0, 36);
-//        glBindVertexArray(0);
-//        glDepthMask(GL_TRUE);
-//        glDepthFunc(GL_LESS); // set depth function back to default
-//
-//        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        // 2. blur bright fragments with two-pass Gaussian Blur
-        // --------------------------------------------------
-        bool horizontal = true, first_iteration = true;
-        unsigned int amount = 10;
-        shaderBlur.use();
-        for (unsigned int i = 0; i < amount; i++)
-        {
-            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[horizontal]);
-            shaderBlur.setInt("horizontal", horizontal);
-            glBindTexture(GL_TEXTURE_2D, first_iteration ? colorBuffers[1] : pingpongColorbuffers[!horizontal]);  // bind texture of other framebuffer (or scene if first iteration)
-            renderQuad();
-            horizontal = !horizontal;
-            if (first_iteration)
-                first_iteration = false;
-        }
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        // 3. now render floating point color buffer to 2D quad and tonemap HDR colors to default framebuffer's (clamped) color range
-        // --------------------------------------------------------------------------------------------------------------------------
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        shaderBloomFinal.use();
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, colorBuffers[0]);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[!horizontal]);
-        shaderBloomFinal.setInt("bloom", bloom);
-        shaderBloomFinal.setFloat("exposure", exposure);
-
         ourShader.use();
-
-        pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
-        ourShader.setVec3("pointLight.position", pointLight.position);
-        ourShader.setVec3("pointLight.ambient", pointLight.ambient);
-        ourShader.setVec3("pointLight.diffuse", pointLight.diffuse);
-        ourShader.setVec3("pointLight.specular", pointLight.specular);
-        ourShader.setFloat("pointLight.constant", pointLight.constant);
-        ourShader.setFloat("pointLight.linear", pointLight.linear);
-        ourShader.setFloat("pointLight.quadratic", pointLight.quadratic);
-
-        ourShader.setVec3("viewPosition", programState->camera.Position);
-
-        ourShader.setFloat("material.shininess", 32.0f);
 
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
@@ -559,32 +414,33 @@ int main() {
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
 
-        shaderGround.use();
-        shaderGround.setMat4("projection", projection);
-        shaderGround.setMat4("view", view);
+        ourShader.setVec3("viewPos", programState->camera.Position);
+        ourShader.setFloat("material.shininess", 32.0f);
 
-        // render parallax-mapped
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK);
-        model = glm::mat4(1.0f); // rotate the quad to show parallax mapping from multiple directions
+        //Directional light
+        ourShader.setVec3("directional.direction", directional.direction);
+        ourShader.setVec3("directional.ambient", directional.ambient);
+        ourShader.setVec3("directional.diffuse", directional.diffuse);
+        ourShader.setVec3("directional.specular", directional.specular);
 
-        shaderGround.setMat4("model", model);
-        shaderGround.setVec3("viewPos", programState->camera.Position);
-        shaderGround.setFloat("heightScale", heightScale); // adjust with Q and E keys
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, diffuseMap);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, normalMap);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, heightMap);
-        renderGround();
+        //Point Lights
+        for(unsigned int i = 0; i < lightPositions.size(); i++){
+            ourShader.setVec3("lights[" + std::to_string(i) + "].position", lightPositions[i]);
+            ourShader.setVec3("lights[" + std::to_string(i) + "].ambient", pointLight.ambient * 0.05f);
+            ourShader.setVec3("lights[" + std::to_string(i) + "].diffuse", pointLight.diffuse * 0.8f);
+            ourShader.setVec3("lights[" + std::to_string(i) + "].specular", pointLight.specular * 0.1f);
+            ourShader.setFloat("lights[" + std::to_string(i) + "].constant", pointLight.constant);
+            ourShader.setFloat("lights[" + std::to_string(i) + "].linear", pointLight.linear);
+            ourShader.setFloat("lights[" + std::to_string(i) + "].quadratic", pointLight.quadratic);
+        }
 
-        glDisable(GL_CULL_FACE);
+        ourShader.setBool("blinn", blinn);
+
         // render the loaded model
         model = glm::mat4(1.0f);
         model = glm::translate(model,
-                               glm::vec3(-7.0f, 3.0f + 0.5*sin(glfwGetTime()), -2.0f)); // translate it down so it's at the center of the scene
-        model = glm::scale(model, glm::vec3(1.2f));    // it's a bit too big for our scene, so scale it down
+                               glm::vec3(-7.0f, 3.5f + 0.5*sin(glfwGetTime()), -2.0f));
+        model = glm::scale(model, glm::vec3(1.2f));
         ourShader.setMat4("model", model);
         ourModel.Draw(ourShader);
 
@@ -598,19 +454,10 @@ int main() {
             dino.Draw(ourShader);
         }
 
-//         set lighting uniforms
-        for (unsigned int i = 0; i < lightPositions.size(); i++)
-        {
-            ourShader.setVec3("lights[" + std::to_string(i) + "].Position", lightPositions[i]);
-            ourShader.setVec3("lights[" + std::to_string(i) + "].Color", lightColors[i]);
-        }
-        ourShader.setVec3("viewPos", programState->camera.Position);
-
-
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
 
-        // finally show all the light sources as bright cubes
+        // show all the light sources as bright cubes
         shaderLight.use();
         shaderLight.setMat4("projection", projection);
         shaderLight.setMat4("view", view);
@@ -627,8 +474,45 @@ int main() {
 
         glDisable(GL_CULL_FACE);
 
+        // GROUND
+        shaderGround.use();
+        shaderGround.setMat4("projection", projection);
+        shaderGround.setMat4("view", view);
+
+        shaderGround.setVec3("viewPos", programState->camera.Position);
+
+        shaderGround.setVec3("directional.direction", directional.direction);
+        shaderGround.setVec3("directional.ambient", directional.ambient-0.46f);
+        shaderGround.setVec3("directional.diffuse", directional.diffuse);
+        shaderGround.setVec3("directional.specular", directional.specular);
+
+        //Point Lights
+        for(unsigned int i = 0; i < lightPositions.size(); i++){
+            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].position", lightPositions[i]);
+            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].ambient", pointLight.ambient * 0.25f);
+            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].diffuse", pointLight.diffuse * 0.82f);
+            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].specular", pointLight.specular * 0.21f);
+        }
+
+        shaderGround.setBool("blinn", blinn);
+
+        // render parallax-mapped
+        model = glm::mat4(1.0f);
+        shaderGround.setMat4("model", model);
+        shaderGround.setFloat("heightScale", heightScale);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, diffuseMap);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, normalMap);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, heightMap);
+
+        renderGround();
+
+        glDisable(GL_CULL_FACE);
+
         // draw skybox as last
-        glDepthMask(GL_FALSE);
         glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
         skyboxShader.use();
         view = glm::mat4(glm::mat3(programState->camera.GetViewMatrix())); // remove translation from the view matrix
@@ -641,11 +525,37 @@ int main() {
         glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
-        glDepthMask(GL_TRUE);
         glDepthFunc(GL_LESS); // set depth function back to default
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+        // 2. blur bright fragments with two-pass Gaussian Blur
+        // --------------------------------------------------
+        bool horizontal = true, first_iteration = true;
+        unsigned int amount = 10;
+        shaderBlur.use();
+        for (unsigned int i = 0; i < amount; i++)
+        {
+            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[horizontal]);
+            shaderBlur.setInt("horizontal", horizontal);
+            glBindTexture(GL_TEXTURE_2D, first_iteration ? colorBuffers[1] : pingpongColorbuffers[!horizontal]);  // bind texture of other framebuffer (or scene if first iteration)
+            renderQuad();
+            horizontal = !horizontal;
+            if (first_iteration)
+                first_iteration = false;
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // 3. now render floating point color buffer to 2D quad and tonemap HDR colors to default framebuffer's (clamped) color range
+        // --------------------------------------------------------------------------------------------------------------------------
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        shaderBloomFinal.use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, colorBuffers[0]);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[!horizontal]);
+        shaderBloomFinal.setInt("bloom", bloom);
+        shaderBloomFinal.setFloat("exposure", exposure);
         renderQuad();
 
 //        std::cout << "bloom: " << (bloom ? "on" : "off") << "| exposure: " << exposure << std::endl;
@@ -730,10 +640,10 @@ void renderGround(){
 
     if (groundVAO == 0){
         // positions
-        glm::vec3 pos1(100.0f,  -0.8f, 100.0f);
-        glm::vec3 pos2(100.0f, -0.8f, -100.0f);
-        glm::vec3 pos3( -150.0f, -0.8f, -100.0f);
-        glm::vec3 pos4( -150.0f,  -0.8f, 100.0f);
+        glm::vec3 pos1(500.0f,  -0.8f, 500.0f);
+        glm::vec3 pos2(500.0f, -0.8f, -500.0f);
+        glm::vec3 pos3( -550.0f, -0.8f, -500.0f);
+        glm::vec3 pos4( -550.0f,  -0.8f, 500.0f);
         // texture coordinates
         glm::vec2 uv1(0.0f, 1.0f);
         glm::vec2 uv2(0.0f, 0.0f);
