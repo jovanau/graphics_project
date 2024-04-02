@@ -37,7 +37,9 @@ public:
     // constructor, expects a filepath to a 3D model.
     Model(string const &path, bool gamma = false) : gammaCorrection(gamma)
     {
+//        std::cout << "Loading model: " << path << '\n';
         loadModel(path);
+//        std::cout << '\n';
     }
 
     // draws the model, and thus all its meshes
@@ -229,6 +231,7 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
     unsigned char *data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
     if (data)
     {
+//        std::cout << "Loading texture: " << filename << '\n';
         GLenum format;
         if (nrComponents == 1)
             format = GL_RED;

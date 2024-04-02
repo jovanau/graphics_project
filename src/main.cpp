@@ -27,6 +27,7 @@ unsigned int loadCubemap(vector<std::string> faces);
 void renderQuad();
 void renderCube();
 void renderGround();
+void funkcija();
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -183,14 +184,18 @@ int main() {
     // -----------
     Model ourModel(FileSystem::getPath("resources/objects/ironman/M-FF_iOS_HERO_Tony_Stark_Iron_Man_Classic.obj"));
     ourModel.SetShaderTextureNamePrefix("material.");
+
+    Model letelice(FileSystem::getPath("resources/objects/novo/up_base.obj"));
+    letelice.SetShaderTextureNamePrefix("material.");
+
     Model dino(FileSystem::getPath("resources/objects/dino/T-rex.obj"));
     dino.SetShaderTextureNamePrefix("material.");
 
     // load textures
     // -------------
-     unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/diffuse.jpg").c_str());
-     unsigned int normalMap  = loadTexture(FileSystem::getPath("resources/textures/normal.jpg").c_str());
-     unsigned int heightMap  = loadTexture(FileSystem::getPath("resources/textures/height.jpg").c_str());
+    unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/t/diffuse.png").c_str());
+    unsigned int normalMap  = loadTexture(FileSystem::getPath("resources/textures/t/normal.png").c_str());
+    unsigned int heightMap  = loadTexture(FileSystem::getPath("resources/textures/t/height.png").c_str());
 
     // configure (floating point) framebuffers
     // ---------------------------------------
@@ -251,7 +256,7 @@ int main() {
     //directional light init
     DirLight directional;
     directional.direction = glm::vec3(8.8f, -2.0f, -1.6f);
-    directional.ambient = glm::vec3(0.5f);
+    directional.ambient = glm::vec3(0.33f);
     directional.diffuse = glm::vec3(0.2f);
     directional.specular = glm::vec3(0.3f);
 
@@ -279,13 +284,13 @@ int main() {
 
     //translation for dinos
     float x[24]  = {
-            0.0f, -7.0, -5.0f, -2.0f, -4.0f, -10.0,
+            0.0f, -17.0, -5.0f, -22.0f, -12.0f, -10.0,
             -1.0f, -6.0f, -9.f, -1.0f, -11.0, -8.0f,
             -1.0f, -5.0f, -7.0f,-3.0f, -11.0f, -2.0f,
             -4.0f, -6.0f, -9.0f,-8.0f, -12.0f, -10.0f,
     };
     float z[24] = {
-            1.0f, 5.0f, 7.0f,3.0f, 11.0f, 2.0f,
+            1.0f, 15.0f, 7.0f,3.0f, 11.0f, 2.0f,
             4.0f, 6.0f, 9.0f,8.0f, 12.0f, 10.0f,
             0.0f, 7.0, 5.0f, 2.0f, 4.0f, 10.0,
             1.0f, 6.0f, 9.f, 1.0f, 11.0, 8.0f
@@ -357,15 +362,6 @@ int main() {
                     FileSystem::getPath("resources/textures/skyy/front.png"),
                     FileSystem::getPath("resources/textures/skyy/back.png")
             };
-//    vector<std::string> faces
-//            {
-//                    FileSystem::getPath("resources/textures/sky/left.jpg"),
-//                    FileSystem::getPath("resources/textures/sky/right.jpg"),
-//                    FileSystem::getPath("resources/textures/sky/top.jpg"),
-//                    FileSystem::getPath("resources/textures/sky/bottom.jpg"),
-//                    FileSystem::getPath("resources/textures/sky/front.jpg"),
-//                    FileSystem::getPath("resources/textures/sky/back.jpg")
-//            };
     unsigned int cubemapTexture = loadCubemap(faces);
 
     // shader configuration
@@ -444,14 +440,14 @@ int main() {
         ourShader.setMat4("model", model);
         ourModel.Draw(ourShader);
 
-        for(unsigned int i = 0; i < 24;i++){
+        for(unsigned int i = 0; i < 5;i++){
             model = glm::mat4(1.0f);
             model = glm::translate(model, glm::vec3(x[i], -0.50f, z[i]));
             model = glm::rotate(model, (float)glm::radians(180.0), glm::vec3(0, 1, 0));
-            model = glm::scale(model, glm::vec3(0.11));
+            model = glm::scale(model, glm::vec3(1.1));
 
             ourShader.setMat4("model", model);
-            dino.Draw(ourShader);
+            letelice.Draw(ourShader);
         }
 
         glEnable(GL_CULL_FACE);
@@ -478,37 +474,57 @@ int main() {
         shaderGround.use();
         shaderGround.setMat4("projection", projection);
         shaderGround.setMat4("view", view);
+//
+//        shaderGround.setVec3("viewPos", programState->camera.Position);
+//
+//        shaderGround.setVec3("directional.direction", directional.direction);
+//        shaderGround.setVec3("directional.ambient", directional.ambient-0.46f);
+//        shaderGround.setVec3("directional.diffuse", directional.diffuse);
+//        shaderGround.setVec3("directional.specular", directional.specular);
+//
+//        //Point Lights
+//        for(unsigned int i = 0; i < lightPositions.size(); i++){
+//            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].position", lightPositions[i]);
+//            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].ambient", pointLight.ambient * 0.25f);
+//            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].diffuse", pointLight.diffuse * 0.82f);
+//            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].specular", pointLight.specular * 0.21f);
+//        }
+//
+//        shaderGround.setBool("blinn", blinn);
+//
+//        // render parallax-mapped
+//        model = glm::mat4(1.0f);
+//        shaderGround.setMat4("model", model);
+//        shaderGround.setFloat("heightScale", heightScale);
+//
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_2D, diffuseMap);
+//        glActiveTexture(GL_TEXTURE1);
+//        glBindTexture(GL_TEXTURE_2D, normalMap);
+//        glActiveTexture(GL_TEXTURE2);
+//        glBindTexture(GL_TEXTURE_2D, heightMap);
+//
+//        renderGround();
 
-        shaderGround.setVec3("viewPos", programState->camera.Position);
-
-        shaderGround.setVec3("directional.direction", directional.direction);
-        shaderGround.setVec3("directional.ambient", directional.ambient-0.46f);
-        shaderGround.setVec3("directional.diffuse", directional.diffuse);
-        shaderGround.setVec3("directional.specular", directional.specular);
-
-        //Point Lights
-        for(unsigned int i = 0; i < lightPositions.size(); i++){
-            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].position", lightPositions[i]);
-            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].ambient", pointLight.ambient * 0.25f);
-            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].diffuse", pointLight.diffuse * 0.82f);
-            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].specular", pointLight.specular * 0.21f);
-        }
-
-        shaderGround.setBool("blinn", blinn);
-
-        // render parallax-mapped
+        // render parallax-mapped quad
         model = glm::mat4(1.0f);
+//        model = glm::translate(model,
+//                               glm::vec3(-7.0f, 3.5f , -2.0f));
+//        model = glm::rotate(model, (float)glm::radians(-180.0), glm::vec3(0, 0, 1));
+//        model = glm::scale(model, glm::vec3(1.2f));
+        model = glm::translate(model, glm::vec3(-5.0f, -3.0f, -2.0));
+        model = glm::rotate(model, (float)glm::radians(180.0), glm::vec3(0, 1, 1));
+        model = glm::scale(model, glm::vec3(50.0f));
         shaderGround.setMat4("model", model);
-        shaderGround.setFloat("heightScale", heightScale);
-
+        shaderGround.setVec3("viewPos", programState->camera.Position);
+        shaderGround.setFloat("heightScale", heightScale); // adjust with Q and E keys
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, diffuseMap);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, normalMap);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, heightMap);
-
-        renderGround();
+        funkcija();
 
         glDisable(GL_CULL_FACE);
 
@@ -634,16 +650,16 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
 }
 
 //Normal-Parallax mapping for ground
-unsigned int groundVAO = 0;
-unsigned int groundVBO;
+unsigned int grounddVAO = 0;
+unsigned int grounddVBO;
 void renderGround(){
 
-    if (groundVAO == 0){
+    if (grounddVAO == 0){
         // positions
         glm::vec3 pos1(500.0f,  -0.8f, 500.0f);
         glm::vec3 pos2(500.0f, -0.8f, -500.0f);
-        glm::vec3 pos3( -550.0f, -0.8f, -500.0f);
-        glm::vec3 pos4( -550.0f,  -0.8f, 500.0f);
+        glm::vec3 pos3( -500.0f, -0.8f, -500.0f);
+        glm::vec3 pos4( -500.0f,  -0.8f, 500.0f);
         // texture coordinates
         glm::vec2 uv1(0.0f, 1.0f);
         glm::vec2 uv2(0.0f, 0.0f);
@@ -706,10 +722,10 @@ void renderGround(){
                 pos4.x, pos4.y, pos4.z, nm.x, nm.y, nm.z, uv4.x, uv4.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z
         };
         // configure plane VAO
-        glGenVertexArrays(1, &groundVAO);
-        glGenBuffers(1, &groundVBO);
-        glBindVertexArray(groundVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, groundVBO);
+        glGenVertexArrays(1, &grounddVAO);
+        glGenBuffers(1, &grounddVBO);
+        glBindVertexArray(grounddVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, grounddVBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(groundVertices), &groundVertices, GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
@@ -722,7 +738,7 @@ void renderGround(){
         glEnableVertexAttribArray(4);
         glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
     }
-    glBindVertexArray(groundVAO);
+    glBindVertexArray(grounddVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
 }
@@ -924,11 +940,11 @@ void renderCube()
 
 // renderQuad() renders a 1x1 XY quad in NDC
 // -----------------------------------------
-unsigned int quadVAO = 0;
-unsigned int quadVBO;
+unsigned int quuadVAO = 0;
+unsigned int quuadVBO;
 void renderQuad()
 {
-    if (quadVAO == 0)
+    if (quuadVAO == 0)
     {
         float quadVertices[] = {
                 // positions        // texture Coords
@@ -938,17 +954,113 @@ void renderQuad()
                 1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
         };
         // setup plane VAO
-        glGenVertexArrays(1, &quadVAO);
-        glGenBuffers(1, &quadVBO);
-        glBindVertexArray(quadVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glGenVertexArrays(1, &quuadVAO);
+        glGenBuffers(1, &quuadVBO);
+        glBindVertexArray(quuadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quuadVBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     }
-    glBindVertexArray(quadVAO);
+    glBindVertexArray(quuadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+}
+
+// renders a 1x1 quad in NDC with manually calculated tangent vectors
+// ------------------------------------------------------------------
+unsigned int quadVAO = 0;
+unsigned int quadVBO;
+void funkcija()
+{
+    if (quadVAO == 0)
+    {
+        // positions
+        glm::vec3 pos1(-1.0f,  1.0f, 0.0f);
+        glm::vec3 pos2(-1.0f, -1.0f, 0.0f);
+        glm::vec3 pos3( 1.0f, -1.0f, 0.0f);
+        glm::vec3 pos4( 1.0f,  1.0f, 0.0f);
+        // texture coordinates
+        glm::vec2 uv1(0.0f, 1.0f);
+        glm::vec2 uv2(0.0f, 0.0f);
+        glm::vec2 uv3(1.0f, 0.0f);
+        glm::vec2 uv4(1.0f, 1.0f);
+        // normal vector
+        glm::vec3 nm(0.0f, 0.0f, 1.0f);
+
+        // calculate tangent/bitangent vectors of both triangles
+        glm::vec3 tangent1, bitangent1;
+        glm::vec3 tangent2, bitangent2;
+        // triangle 1
+        // ----------
+        glm::vec3 edge1 = pos2 - pos1;
+        glm::vec3 edge2 = pos3 - pos1;
+        glm::vec2 deltaUV1 = uv2 - uv1;
+        glm::vec2 deltaUV2 = uv3 - uv1;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        tangent1.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent1.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent1.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+        tangent1 = glm::normalize(tangent1);
+
+        bitangent1.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+        bitangent1.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+        bitangent1.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+        bitangent1 = glm::normalize(bitangent1);
+
+        // triangle 2
+        // ----------
+        edge1 = pos3 - pos1;
+        edge2 = pos4 - pos1;
+        deltaUV1 = uv3 - uv1;
+        deltaUV2 = uv4 - uv1;
+
+        f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        tangent2.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent2.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent2.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+        tangent2 = glm::normalize(tangent2);
+
+
+        bitangent2.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+        bitangent2.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+        bitangent2.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+        bitangent2 = glm::normalize(bitangent2);
+
+
+        float quadVertices[] = {
+                // positions            // normal         // texcoords  // tangent                          // bitangent
+                pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+                pos2.x, pos2.y, pos2.z, nm.x, nm.y, nm.z, uv2.x, uv2.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+                pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+
+                pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
+                pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
+                pos4.x, pos4.y, pos4.z, nm.x, nm.y, nm.z, uv4.x, uv4.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z
+        };
+        // configure plane VAO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(6 * sizeof(float)));
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
+        glEnableVertexAttribArray(4);
+        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
+    }
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
 }
