@@ -26,8 +26,7 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 unsigned int loadCubemap(vector<std::string> faces);
 void renderQuad();
 void renderCube();
-void renderGround();
-void funkcija();
+void ground();
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -128,7 +127,7 @@ int main() {
 
     // glfw window creation
     // --------------------
-    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "EndGame", NULL, NULL);
     if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -175,21 +174,21 @@ int main() {
     Shader shaderBlur("resources/shaders/blur.vs", "resources/shaders/blur.fs");
     Shader shaderBloomFinal("resources/shaders/bloom_final.vs", "resources/shaders/bloom_final.fs");
 
-    Shader skyboxShader("resources/shaders/6.1.skybox.vs", "resources/shaders/6.1.skybox.fs");
-    Shader ourShader("resources/shaders/1.model_loading.vs", "resources/shaders/1.model_loading.fs");
+    Shader skyboxShader("resources/shaders/skybox.vs", "resources/shaders/skybox.fs");
+    Shader modelShader("resources/shaders/model.vs", "resources/shaders/model.fs");
 
     Shader shaderGround("resources/shaders/parallax_mapping.vs", "resources/shaders/parallax_mapping.fs");
 
     // load models
     // -----------
-    Model ourModel(FileSystem::getPath("resources/objects/ironman/M-FF_iOS_HERO_Tony_Stark_Iron_Man_Classic.obj"));
-    ourModel.SetShaderTextureNamePrefix("material.");
+    Model ironman(FileSystem::getPath("resources/objects/ironman/M-FF_iOS_HERO_Tony_Stark_Iron_Man_Classic.obj"));
+    ironman.SetShaderTextureNamePrefix("material.");
 
-    Model letelice(FileSystem::getPath("resources/objects/novo/up_base.obj"));
-    letelice.SetShaderTextureNamePrefix("material.");
+    Model monster(FileSystem::getPath("resources/objects/monster/scene.gltf"));
+    monster.SetShaderTextureNamePrefix("material.");
 
-    Model dino(FileSystem::getPath("resources/objects/dino/T-rex.obj"));
-    dino.SetShaderTextureNamePrefix("material.");
+    Model city(FileSystem::getPath("resources/objects/city/Star Wars inspired low poly buildings.obj"));
+    city.SetShaderTextureNamePrefix("material.");
 
     // load textures
     // -------------
@@ -282,22 +281,15 @@ int main() {
     pointLight.linear = 0.09f;
     pointLight.quadratic = 0.032f;
 
-    //translation for dinos
-    float x[24]  = {
-            0.0f, -17.0, -5.0f, -22.0f, -12.0f, -10.0,
-            -1.0f, -6.0f, -9.f, -1.0f, -11.0, -8.0f,
-            -1.0f, -5.0f, -7.0f,-3.0f, -11.0f, -2.0f,
-            -4.0f, -6.0f, -9.0f,-8.0f, -12.0f, -10.0f,
+    //translation for monsters
+    float x[5]  = {
+            10.0f, 2.0, -6.0f, -14.0f, -22.0f
     };
-    float z[24] = {
-            1.0f, 15.0f, 7.0f,3.0f, 11.0f, 2.0f,
-            4.0f, 6.0f, 9.0f,8.0f, 12.0f, 10.0f,
-            0.0f, 7.0, 5.0f, 2.0f, 4.0f, 10.0,
-            1.0f, 6.0f, 9.f, 1.0f, 11.0, 8.0f
+    float z[5] = {
+            10.0f, 20.0f, 7.0f,23.0f, 11.0f
     };
 
-    // set up vertex data (and buffer(s)) and configure vertex attributes
-    // ------------------------------------------------------------------
+
     float skyboxVertices[] = {
             // positions
             -1.0f,  1.0f, -1.0f,
@@ -398,62 +390,67 @@ int main() {
         glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // don't forget to enable shader before setting uniforms
-        ourShader.use();
-
+        modelShader.use();
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
                                                 (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = programState->camera.GetViewMatrix();
         glm::mat4 model = glm::mat4(1.0f);
 
-        ourShader.setMat4("projection", projection);
-        ourShader.setMat4("view", view);
+        modelShader.setMat4("projection", projection);
+        modelShader.setMat4("view", view);
 
-        ourShader.setVec3("viewPos", programState->camera.Position);
-        ourShader.setFloat("material.shininess", 32.0f);
+        modelShader.setVec3("viewPos", programState->camera.Position);
+        modelShader.setFloat("material.shininess", 32.0f);
 
         //Directional light
-        ourShader.setVec3("directional.direction", directional.direction);
-        ourShader.setVec3("directional.ambient", directional.ambient);
-        ourShader.setVec3("directional.diffuse", directional.diffuse);
-        ourShader.setVec3("directional.specular", directional.specular);
+        modelShader.setVec3("directional.direction", directional.direction);
+        modelShader.setVec3("directional.ambient", directional.ambient);
+        modelShader.setVec3("directional.diffuse", directional.diffuse);
+        modelShader.setVec3("directional.specular", directional.specular);
 
         //Point Lights
         for(unsigned int i = 0; i < lightPositions.size(); i++){
-            ourShader.setVec3("lights[" + std::to_string(i) + "].position", lightPositions[i]);
-            ourShader.setVec3("lights[" + std::to_string(i) + "].ambient", pointLight.ambient * 0.05f);
-            ourShader.setVec3("lights[" + std::to_string(i) + "].diffuse", pointLight.diffuse * 0.8f);
-            ourShader.setVec3("lights[" + std::to_string(i) + "].specular", pointLight.specular * 0.1f);
-            ourShader.setFloat("lights[" + std::to_string(i) + "].constant", pointLight.constant);
-            ourShader.setFloat("lights[" + std::to_string(i) + "].linear", pointLight.linear);
-            ourShader.setFloat("lights[" + std::to_string(i) + "].quadratic", pointLight.quadratic);
+            modelShader.setVec3("lights[" + std::to_string(i) + "].position", lightPositions[i]);
+            modelShader.setVec3("lights[" + std::to_string(i) + "].ambient", pointLight.ambient * 0.05f);
+            modelShader.setVec3("lights[" + std::to_string(i) + "].diffuse", pointLight.diffuse * 0.8f);
+            modelShader.setVec3("lights[" + std::to_string(i) + "].specular", pointLight.specular * 0.1f);
+            modelShader.setFloat("lights[" + std::to_string(i) + "].constant", pointLight.constant);
+            modelShader.setFloat("lights[" + std::to_string(i) + "].linear", pointLight.linear);
+            modelShader.setFloat("lights[" + std::to_string(i) + "].quadratic", pointLight.quadratic);
         }
 
-        ourShader.setBool("blinn", blinn);
+        modelShader.setBool("blinn", blinn);
 
         // render the loaded model
         model = glm::mat4(1.0f);
         model = glm::translate(model,
-                               glm::vec3(-7.0f, 3.5f + 0.5*sin(glfwGetTime()), -2.0f));
-        model = glm::scale(model, glm::vec3(1.2f));
-        ourShader.setMat4("model", model);
-        ourModel.Draw(ourShader);
+                               glm::vec3(-7.0f, 2.75f + 0.5*sin(glfwGetTime()), -2.0f));
+        model = glm::scale(model, glm::vec3(1.95f));
+        modelShader.setMat4("model", model);
+        ironman.Draw(modelShader);
 
         for(unsigned int i = 0; i < 5;i++){
             model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(x[i], -0.50f, z[i]));
+            model = glm::translate(model, glm::vec3(x[i], -3, z[i]));
             model = glm::rotate(model, (float)glm::radians(180.0), glm::vec3(0, 1, 0));
-            model = glm::scale(model, glm::vec3(1.1));
+            model = glm::scale(model, glm::vec3(0.521));
 
-            ourShader.setMat4("model", model);
-            letelice.Draw(ourShader);
+            modelShader.setMat4("model", model);
+            monster.Draw(modelShader);
         }
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(-6, -3, -25));
+        model = glm::scale(model, glm::vec3(0.3));
+
+        modelShader.setMat4("model", model);
+        city.Draw(modelShader);
 
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
 
-        // show all the light sources as bright cubes
+        // bright cubes
         shaderLight.use();
         shaderLight.setMat4("projection", projection);
         shaderLight.setMat4("view", view);
@@ -474,57 +471,39 @@ int main() {
         shaderGround.use();
         shaderGround.setMat4("projection", projection);
         shaderGround.setMat4("view", view);
-//
-//        shaderGround.setVec3("viewPos", programState->camera.Position);
-//
-//        shaderGround.setVec3("directional.direction", directional.direction);
-//        shaderGround.setVec3("directional.ambient", directional.ambient-0.46f);
-//        shaderGround.setVec3("directional.diffuse", directional.diffuse);
-//        shaderGround.setVec3("directional.specular", directional.specular);
-//
-//        //Point Lights
-//        for(unsigned int i = 0; i < lightPositions.size(); i++){
-//            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].position", lightPositions[i]);
-//            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].ambient", pointLight.ambient * 0.25f);
-//            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].diffuse", pointLight.diffuse * 0.82f);
-//            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].specular", pointLight.specular * 0.21f);
-//        }
-//
-//        shaderGround.setBool("blinn", blinn);
-//
-//        // render parallax-mapped
-//        model = glm::mat4(1.0f);
-//        shaderGround.setMat4("model", model);
-//        shaderGround.setFloat("heightScale", heightScale);
-//
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, diffuseMap);
-//        glActiveTexture(GL_TEXTURE1);
-//        glBindTexture(GL_TEXTURE_2D, normalMap);
-//        glActiveTexture(GL_TEXTURE2);
-//        glBindTexture(GL_TEXTURE_2D, heightMap);
-//
-//        renderGround();
+
+        shaderGround.setVec3("viewPos", programState->camera.Position);
+        shaderGround.setFloat("heightScale", heightScale);
+
+        shaderGround.setVec3("directional.direction", directional.direction);
+        shaderGround.setVec3("directional.ambient", directional.ambient-glm::vec3(0.2f));
+        shaderGround.setVec3("directional.diffuse", directional.diffuse+glm::vec3(0.92f));
+        shaderGround.setVec3("directional.specular", directional.specular-glm::vec3(0.3f));
+
+        //Point Lights
+        for(unsigned int i = 0; i < lightPositions.size(); i++){
+            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].position", lightPositions[i]);
+            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].ambient", pointLight.ambient);
+            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].diffuse", pointLight.diffuse);
+            shaderGround.setVec3("pointlight[" + std::to_string(i) + "].specular", pointLight.specular);
+        }
+
+        shaderGround.setBool("blinn", blinn);
 
         // render parallax-mapped quad
         model = glm::mat4(1.0f);
-//        model = glm::translate(model,
-//                               glm::vec3(-7.0f, 3.5f , -2.0f));
-//        model = glm::rotate(model, (float)glm::radians(-180.0), glm::vec3(0, 0, 1));
-//        model = glm::scale(model, glm::vec3(1.2f));
         model = glm::translate(model, glm::vec3(-5.0f, -3.0f, -2.0));
         model = glm::rotate(model, (float)glm::radians(180.0), glm::vec3(0, 1, 1));
         model = glm::scale(model, glm::vec3(50.0f));
         shaderGround.setMat4("model", model);
-        shaderGround.setVec3("viewPos", programState->camera.Position);
-        shaderGround.setFloat("heightScale", heightScale); // adjust with Q and E keys
+
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, diffuseMap);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, normalMap);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, heightMap);
-        funkcija();
+        ground();
 
         glDisable(GL_CULL_FACE);
 
@@ -590,6 +569,7 @@ int main() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
 
@@ -647,100 +627,6 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
     programState->camera.ProcessMouseScroll(yoffset);
-}
-
-//Normal-Parallax mapping for ground
-unsigned int grounddVAO = 0;
-unsigned int grounddVBO;
-void renderGround(){
-
-    if (grounddVAO == 0){
-        // positions
-        glm::vec3 pos1(500.0f,  -0.8f, 500.0f);
-        glm::vec3 pos2(500.0f, -0.8f, -500.0f);
-        glm::vec3 pos3( -500.0f, -0.8f, -500.0f);
-        glm::vec3 pos4( -500.0f,  -0.8f, 500.0f);
-        // texture coordinates
-        glm::vec2 uv1(0.0f, 1.0f);
-        glm::vec2 uv2(0.0f, 0.0f);
-        glm::vec2 uv3(1.0f, 0.0f);
-        glm::vec2 uv4(1.0f, 1.0f);
-        // normal vector
-        glm::vec3 nm(0.0f, 0.0f, 1.0f);
-
-        // calculate tangent/bitangent vectors of both triangles
-        glm::vec3 tangent1, bitangent1;
-        glm::vec3 tangent2, bitangent2;
-        // triangle 1
-        // ----------
-        glm::vec3 edge1 = pos2 - pos1;
-        glm::vec3 edge2 = pos3 - pos1;
-        glm::vec2 deltaUV1 = uv2 - uv1;
-        glm::vec2 deltaUV2 = uv3 - uv1;
-
-        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
-
-        tangent1.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
-        tangent1.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
-        tangent1.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
-        tangent1 = glm::normalize(tangent1);
-
-        bitangent1.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
-        bitangent1.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
-        bitangent1.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
-        bitangent1 = glm::normalize(bitangent1);
-
-        // triangle 2
-        // ----------
-        edge1 = pos3 - pos1;
-        edge2 = pos4 - pos1;
-        deltaUV1 = uv3 - uv1;
-        deltaUV2 = uv4 - uv1;
-
-        f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
-
-        tangent2.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
-        tangent2.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
-        tangent2.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
-        tangent2 = glm::normalize(tangent2);
-
-
-        bitangent2.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
-        bitangent2.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
-        bitangent2.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
-        bitangent2 = glm::normalize(bitangent2);
-
-
-        float groundVertices[] = {
-                // positions            // normal         // texcoords  // tangent                          // bitangent
-                pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
-                pos2.x, pos2.y, pos2.z, nm.x, nm.y, nm.z, uv2.x, uv2.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
-                pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
-
-                pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
-                pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
-                pos4.x, pos4.y, pos4.z, nm.x, nm.y, nm.z, uv4.x, uv4.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z
-        };
-        // configure plane VAO
-        glGenVertexArrays(1, &grounddVAO);
-        glGenBuffers(1, &grounddVBO);
-        glBindVertexArray(grounddVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, grounddVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(groundVertices), &groundVertices, GL_STATIC_DRAW);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(6 * sizeof(float)));
-        glEnableVertexAttribArray(3);
-        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
-        glEnableVertexAttribArray(4);
-        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
-    }
-    glBindVertexArray(grounddVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
 }
 
 void DrawImGui(ProgramState *programState) {
@@ -973,7 +859,7 @@ void renderQuad()
 // ------------------------------------------------------------------
 unsigned int quadVAO = 0;
 unsigned int quadVBO;
-void funkcija()
+void ground()
 {
     if (quadVAO == 0)
     {

@@ -1,0 +1,11 @@
+Model Information:
+* title:	The Green Monster
+* source:	https://sketchfab.com/3d-models/the-green-monster-a291d1121bff47669feb542c6caed09a
+* author:	StraXartS (https://sketchfab.com/Strax123trt)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "The Green Monster" (https://sketchfab.com/3d-models/the-green-monster-a291d1121bff47669feb542c6caed09a) by StraXartS (https://sketchfab.com/Strax123trt) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
